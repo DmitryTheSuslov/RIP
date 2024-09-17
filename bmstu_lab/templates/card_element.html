@@ -1,0 +1,7 @@
+{%load static%}
+<link rel="stylesheet" type="text/css" href="{% static 'css/card.css' %}">
+<div class="card">
+    <img src="http://127.0.0.1:9000/lab1/{{element.id}}.jpg" class="image">
+    <p class="title">{{element.address}}</p>
+    <a href="{% url 'address_url' element.id %}" class="card-button">Подробнее</a> 
+  </div>

@@ -1,0 +1,23 @@
+.row{
+    align-items: center;
+    /* position: relative; */
+    display: flex;
+    margin: 0 auto;
+    border-radius: 20px;
+    background: #60b1d7;
+    /* justify-content: space-between; */
+    filter: drop-shadow(3px 3px #3f5f6d);
+    width: 70%;
+    margin-top: 2%;
+    padding: 0.5%;
+}
+
+.image{
+    width: 22%;
+    height: 22%;
+    border-radius: 20px;
+}
+
+.address{
+    margin-left: 2%;
+}

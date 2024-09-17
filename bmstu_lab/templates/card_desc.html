@@ -1,0 +1,14 @@
+{%extends "base.html"%}
+{%load static %}
+
+{%block content%}
+<link rel="stylesheet" type="text/css" href="{% static 'css/card_desc.css' %}">
+<div class="card">
+    <img src="http://127.0.0.1:9000/lab1/{{data.id}}.jpg" class="image-card">
+    <div class="desc">
+        <p class="address">Адрес: {{data.address}}</p>
+        <p>Показания счетчиков: </p>
+        <p class="count">11023432</p>
+    </div>
+</div>
+{%endblock%}

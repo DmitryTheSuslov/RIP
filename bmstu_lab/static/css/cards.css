@@ -1,0 +1,97 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+* {box-sizing: border-box;}
+
+body{
+    margin: 0 auto;
+    background: #0074a8;
+}
+.space{
+    width: 80%;
+    margin: 0 auto;
+}
+.container{
+    margin-top: 2%;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 30px;
+}
+.card{
+    border-radius: 20px;
+    background-color: #b5e2f6;
+    padding: 2%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    filter: drop-shadow(3px 3px #3f5f6d);
+}
+.image{
+    width: 100%;
+    height: 211px;
+    border-radius: 15px;
+    object-fit: cover;
+}
+.card-button{
+    padding: 8px 8px; 
+    border-radius: 10px;
+    border: 1px solid #fc6e51;
+    text-decoration: none;
+    color: #761d1d;
+    font-size: 14px;
+    font-weight: 500;
+    width: 40%;
+}
+
+.double-col{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 20%;
+    margin: 0 auto;
+    position: relative;
+    width: 800px;
+    margin-top: 2%;
+}
+
+.cart{
+    object-fit: fill;
+    height: 10%;
+    width: 50%;
+}
+
+.url-cart{
+    text-align: end;
+    width: 10%;
+}
+
+form {
+    position: relative;
+    width: 100%;
+  }
+input {
+    width: 100%;
+    height: 42px;
+    padding-left: 10px;
+    border: 2px solid #7BA7AB;
+    border-radius: 15px;
+    outline: none;
+    background: #D9F2FD;
+    color: #000000;
+  }
+button {
+    position: absolute; 
+    top: 0;
+    right: 0px;
+    width: 42px;
+    height: 42px;
+    border: none;
+    background: #fc6e51;
+    border-radius: 0 15px 15px 0;
+    cursor: pointer;
+    border: 2px solid #7BA7AB;
+  }
+button:before {
+    content: "\f002";
+    font-family: FontAwesome;
+    font-size: 16px;
+    color: #D9F2FD;
+  }

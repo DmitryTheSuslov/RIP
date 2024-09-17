@@ -1,0 +1,14 @@
+{%extends 'base.html'%}
+{%load static%}
+
+{%block content%}
+<link rel='stylesheet' type='text/css' href="{% static 'css/orders.css' %}">
+<div class='container'>
+    <p class="title">Сентябрь</p>
+    {% for row in data.addresses %}
+        {% include 'order_element.html' with element=row%}
+    {% empty %}
+        <li>Список пуст</li>
+    {% endfor %}
+</div>
+{%endblock%}
