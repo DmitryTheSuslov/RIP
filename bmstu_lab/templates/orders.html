@@ -4,9 +4,16 @@
 {%block content%}
 <link rel='stylesheet' type='text/css' href="{% static 'css/orders.css' %}">
 <div class='container'>
+    <form method="post" action="/fixation/{{ fixation.id }}/delete/">
+        {% csrf_token %}
+            <button class="btn btn-danger delete-draft-expedition-btn" type="submit">
+                Удалить
+            </button>
+        </a>
+    </form>
     <p class="title">Сентябрь</p>
-    {% for row in data.addresses %}
-        {% include 'order_element.html' with element=row%}
+    {% for row in fixation.get_addresses %}
+        {% include 'order_element.html' %}
     {% empty %}
         <li>Список пуст</li>
     {% endfor %}

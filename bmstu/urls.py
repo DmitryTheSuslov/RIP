@@ -4,8 +4,9 @@ from bmstu_lab import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('hello/', views.hello),
-    path('', views.GetAddresses),
-    path('address/<int:id>/', views.GetCard, name="address_url"),
-    path('orders/', views.GetOrders)
+    path('', views.index),
+    path('address/<int:id>/', views.address_details, name="address_url"),
+    path('address/<int:id>/add/', views.add_address),
+    path('fixation/<int:id>/', views.fixation_details),
+    path('fixation/<int:id>/delete/', views.del_fixation)
 ]

@@ -1,7 +1,15 @@
 {%load static%}
 <link rel="stylesheet" type="text/css" href="{% static 'css/card.css' %}">
 <div class="card">
-    <img src="http://127.0.0.1:9000/lab1/{{element.id}}.jpg" class="image">
-    <p class="title">{{element.address}}</p>
-    <a href="{% url 'address_url' element.id %}" class="card-button">Подробнее</a> 
+    <img src="{{address.image}}" class="image">
+    <p class="title">{{address.address}}</p>
+    <div class='buttons'>
+      <a href="{% url 'address_url' address.id %}" class="card-button">Подробнее</a> 
+      <form method="post" action="/address/{{ address.id }}/add/" class="col d-flex justify-content-center">
+        {% csrf_token %}
+        <button class="added" type="submit">
+          Добавить
+        </button>
+      </form>
+    </div>
   </div>

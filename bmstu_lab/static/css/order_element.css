@@ -12,6 +12,11 @@
     padding: 0.5%;
 }
 
+.col{
+    font-size: larger;
+    margin-left: 2%;
+}
+
 .image{
     width: 22%;
     height: 22%;
@@ -20,4 +25,17 @@
 
 .address{
     margin-left: 2%;
+}
+
+.count {
+    margin-top: 1%;
+    width: 125px;
+    border: 2px solid #4babeb;
+    padding: 10px;
+    border-radius: 10px;
+    box-shadow: 0 0 10px #0003;
+    background-color: #f2f2f2;
+    color: #333;
+    font-size: 30px;
+    font-family: Impact,Haettenschweiler,Arial Narrow Bold,sans-serif
 }

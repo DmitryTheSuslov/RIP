@@ -77,7 +77,8 @@ input {
     background: #D9F2FD;
     color: #000000;
   }
-button {
+
+.search_button {
     position: absolute; 
     top: 0;
     right: 0px;
@@ -89,7 +90,8 @@ button {
     cursor: pointer;
     border: 2px solid #7BA7AB;
   }
-button:before {
+
+.search_button::before {
     content: "\f002";
     font-family: FontAwesome;
     font-size: 16px;

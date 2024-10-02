@@ -1,3 +1,6 @@
 from django.contrib import admin
+from bmstu_lab.models import *
 
-# Register your models here.
+admin.site.register(Address)
+admin.site.register(Fixation)
+admin.site.register(AddressFixation)

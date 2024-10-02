@@ -13,6 +13,23 @@
     border-radius: 15px;
     object-fit: cover;
 }
+.buttons{
+    display: flex;
+    justify-content: center;
+}
+.added{
+    background: url("http://127.0.0.1:9000/images/add.png");
+    margin-left: 85px;
+    margin-right: 3px;
+    border-radius: 10px;
+    border: 0px solid #000000;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    width: 40%;
+    height: 35px;
+}
+
 .card-button{
     padding: 8px 8px; 
     border-radius: 10px;
