@@ -35,8 +35,10 @@ urlpatterns = [
     path('api/fixations/<int:fix_id>/update_status_user/', update_status_user),  
     path('api/fixations/<int:fix_id>/update_status_admin/', update_status_admin),  
     path('api/fixations/<int:fix_id>/delete/', delete_fix),  
+
     path('api/fixations/<int:fix_id>/update_address/<int:address_id>/', update_address_in_fix),  
     path('api/fixations/<int:fix_id>/delete_address/<int:address_id>/', delete_address_from_fix), 
+    
     path('api/users/<int:user_id>/update/', update_user), 
     path('api/users/register/', register)
 ]

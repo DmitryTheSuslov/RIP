@@ -7,8 +7,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response 
 from .serializers import *
 
-def GetDraftBooking(id=None):
-    """ПОЛУЧЕНИЕ ЧЕРНОВИКА ЗАЯВКИ"""
+def GetDraftFix(id=None):
     current_user = GetUser()
     if id is not None:
         return Fixation.objects.filter(owner=current_user.id, fixation_id=id).first() 
@@ -16,14 +15,13 @@ def GetDraftBooking(id=None):
         return Fixation.objects.filter(owner=current_user.id, status=1).first() 
 
 def GetUser():
-    """ВЫБОР ПОЛЬЗОВАТЕЛЯ"""
     return User.objects.filter(is_superuser=False).first()
 
 def get_moderator():
     return User.objects.filter(is_superuser=True).first()
 
-def GetBooking(id):
-    draft_booking = GetDraftBooking(id)
+def GetFix(id):
+    draft_booking = GetDraftFix(id)
     fixation_addresses = AddressFixation.objects.filter(fixation=draft_booking)
     addresses = []
     for item in fixation_addresses:
@@ -37,7 +35,7 @@ def GetBooking(id):
 #1
 @api_view(["GET"])
 def search_addresses(request):
-    draft = GetDraftBooking()
+    draft = GetDraftFix()
     addresses = AddressFixation.objects.filter(fixation=draft)
     serializer = AddressSerializer(addresses, many=True)
     response = {    
@@ -101,7 +99,7 @@ def add_address_to_fix(request, address_id):
     if not Address.objects.filter(address_id=address_id).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
     address = Address.objects.get(address_id=address_id)
-    draft_booking = GetDraftBooking()
+    draft_booking = GetDraftFix()
     if draft_booking is None:
         draft_booking = Fixation.objects.create()
         draft_booking.owner = GetUser()
@@ -132,7 +130,6 @@ def update_address_image(request, address_id):
 #8
 @api_view(["GET"])
 def fixations_list(request):
-    # status = int(request.GET.get("status", 0))
     date_formation_start = request.GET.get("date_formation_start")
     date_formation_end = request.GET.get("date_formation_end")
 
