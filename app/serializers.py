@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import *
 from django.contrib.auth.models import User
+from collections import OrderedDict
 
 class FixationsSerializer(serializers.ModelSerializer):
     owner = serializers.SerializerMethodField()
@@ -16,21 +17,16 @@ class FixationsSerializer(serializers.ModelSerializer):
             return application.moderator.username
 
     def get_addresses(self, fix):
-        addresses = AddressFixation.objects.filter(fixation=fix)
-        return AddressSerializer(addresses, many=True).data
-    
+        addresses = Address.objects.all()
+        # addresses = AddressFixation.objects.filter(fixation=fix)
+        return AddressInfoSerializer(addresses, many=True).data
+
     def get_addresses_count(self, obj):
         return AddressFixation.objects.filter(fixation=obj).count()
     
     class Meta:
         model = Fixation
         fields = ['fixation_id', 'status', 'month', 'addresses', 'created_at', 'submitted_at', 'completed_at', 'owner', 'moderator', 'addresses_count']
-
-
-class UserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ['id', 'email', 'password', 'first_name', 'last_name', 'date_joined', 'password', 'username']
     
 class AddressFixationSerializer(serializers.ModelSerializer):
     class Meta:
@@ -38,6 +34,18 @@ class AddressFixationSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 class AddressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Address
+        fields = "__all__"
+
+    def get_fields(self):
+        new_fields = OrderedDict()
+        for name, field in super().get_fields().items():
+            field.required = False
+            new_fields[name] = field
+        return new_fields
+
+class AddressInfoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Address
         fields = "__all__"
@@ -60,3 +68,12 @@ class UserRegisterSerializer(serializers.ModelSerializer):
         user.set_password(validated_data['password'])
         user.save()
         return user
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'email', 'password', 'first_name', 'last_name', 'date_joined', 'password', 'username']
+
+class UserLoginSerializer(serializers.Serializer):
+    username = serializers.CharField(required=True)
+    password = serializers.CharField(required=True)

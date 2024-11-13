@@ -41,8 +41,6 @@ class Fixation(models.Model):
     moderator = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="Модератор", null=True, related_name='moderator')
     status = models.IntegerField(choices=STATUS_CHOICES, default=1,blank=True, null=True)
 
-
-
     def __str__(self):
         return "Фиксация №" + str(self.pk)
 
@@ -59,7 +57,8 @@ class AddressFixation(models.Model):
     mm_id = models.AutoField(primary_key=True)
     address = models.ForeignKey(Address, models.DO_NOTHING, blank=True, null=True)
     fixation = models.ForeignKey(Fixation, models.DO_NOTHING, blank=True, null=True)
-    value = models.IntegerField(verbose_name="Поле м-м", blank=True, null=True)
+    water_counter_value = models.IntegerField(verbose_name="Поле м-м", blank=True, null=True)
+    pay_date = models.DateField(blank=True, null=True)
 
     def __str__(self):
         return "м-м №" + str(self.pk)

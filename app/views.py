@@ -1,20 +1,44 @@
-import requests
-from django.http import HttpResponse
+from rest_framework.response import Response
+from rest_framework import status
+from .serializers import *
+from .models import *
+from rest_framework.views import APIView
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+# from .miniof import *
+import logging
+from django.contrib.auth import authenticate, login, logout
+from rest_framework.permissions import IsAuthenticated
+from django.views.decorators.csrf import csrf_exempt
+from django.db.models import Q
+import datetime
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
-from rest_framework import status
-from rest_framework.decorators import api_view
-from rest_framework.response import Response 
-from .serializers import *
+from drf_yasg.utils import swagger_auto_schema
+from rest_framework import viewsets
+from django.http import HttpResponse
+from rest_framework.permissions import AllowAny
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework import permissions
+import uuid
+from django.conf import settings
+from .permissions import *
+from django.db.models import Min, Max
 
-def GetDraftFix(id=None):
-    current_user = GetUser()
-    if id is not None:
-        return Fixation.objects.filter(owner=current_user.id, fixation_id=id).first() 
-    else:
-        return Fixation.objects.filter(owner=current_user.id, status=1).first() 
+
+session_storage = redis.StrictRedis(host=settings.REDIS_HOST, port=settings.REDIS_PORT)
+
+
+def GetDraftFix(user):
+    if Fixation.objects.filter(owner=user, status=1).exists():
+        return Fixation.objects.filter(owner=user, status=1).first()
+    return None
 
 def GetUser():
+    try:
+        username = session_storage.get(request.COOKIES["session_id"])
+        username = username.decode('utf-8') 
+    except:
+        username = ''
     return User.objects.filter(is_superuser=False).first()
 
 def get_moderator():
@@ -32,40 +56,63 @@ def GetFix(id):
         addresses.append(address)
     return addresses
 
-#1
+# ADDRESSES
+
 @api_view(["GET"])
 def search_addresses(request):
-    draft = GetDraftFix()
-    addresses = AddressFixation.objects.filter(fixation=draft)
+    # draft = GetDraftFix()
+    try:
+        username = session_storage.get(request.COOKIES["session_id"])
+        username = username.decode('utf-8') 
+    except:
+        username = ''
+
+    fix_id = None
+    fix_count = 0
+
+    if User.objects.filter(username = username).exists():
+        user = get_object_or_404(User, username = username)
+        if Fixation.objects.filter(owner = user, status = 1).exists():
+            fix = get_object_or_404(Fixation, owner = user, status = 1)
+            fix_id = fix.fixation_id
+            fix_count = fix_id
+
+    addresses = Address.objects.filter(status='active')
     serializer = AddressSerializer(addresses, many=True)
     response = {    
         "addresses" : serializer.data,
-        "draft_fixation" : draft.fixation_id if draft else None,
-        "addresses_count" : addresses.count()
+        "draft_fixation" : fix_id,
+        "addresses_count" : fix_count
     }
     return Response(response)
 
 #2
 @api_view(["GET"])
 def get_address_by_id(request, address_id):
-    if not Address.objects.filter(address_id=address_id).exists():
+    if not Address.objects.filter(address_id=address_id, status='active').exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
     address = Address.objects.get(address_id=address_id)
     serializer = AddressSerializer(address, many=False)
     return Response(serializer.data)
 
 #3
+@swagger_auto_schema(method='post', request_body=AddressSerializer)
 @api_view(["POST"])
+@permission_classes([IsModerator])
 def create_address(request):
-    Address.objects.create()
+    address = Address.objects.create()
+    address.address_name = request.data['address_name']
+    address.save()
     addresses = Address.objects.filter(status='active')
     serializer = AddressSerializer(addresses, many=True)
     return Response(serializer.data)
 
 #4
+@swagger_auto_schema(method='put', request_body=AddressSerializer)
 @api_view(["PUT"])
+@permission_classes([IsModerator])
 def update_address(request, address_id):
-    if not Address.objects.filter(address_id=address_id).exists():
+    if not Address.objects.filter(address_id=address_id, status='active').exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
     address = Address.objects.get(address_id=address_id)
     name = request.data.get("name")
@@ -83,8 +130,9 @@ def update_address(request, address_id):
 
 #5
 @api_view(["DELETE"])
+@permission_classes([IsModerator])
 def delete_address(request, address_id):
-    if not Address.objects.filter(address_id=address_id).exists():
+    if not Address.objects.filter(address_id=address_id, status='active').exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
     address = Address.objects.get(address_id=address_id)
     address.status = 'inactive'
@@ -94,15 +142,20 @@ def delete_address(request, address_id):
     return Response(serializer.data)
 
 #6
+@swagger_auto_schema(method='post', request_body=FixationsSerializer)
 @api_view(["POST"])
+@permission_classes([IsAuth])
 def add_address_to_fix(request, address_id):
-    if not Address.objects.filter(address_id=address_id).exists():
+    username = session_storage.get(request.COOKIES["session_id"])
+    username = username.decode('utf-8') 
+    user = get_object_or_404(User, username = username)
+    if not Address.objects.filter(address_id=address_id, status='active').exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
     address = Address.objects.get(address_id=address_id)
-    draft_booking = GetDraftFix()
+    draft_booking = GetDraftFix(user)
     if draft_booking is None:
         draft_booking = Fixation.objects.create()
-        draft_booking.owner = GetUser()
+        draft_booking.owner = user
         draft_booking.created_at = timezone.now()
         draft_booking.save()
     if AddressFixation.objects.filter(fixation=draft_booking, address=address).exists():
@@ -115,9 +168,11 @@ def add_address_to_fix(request, address_id):
     return Response(serializer.data["addresses"])
 
 #7
+@swagger_auto_schema(method='post', request_body=AddressSerializer)
 @api_view(["POST"])
+@permission_classes([IsModerator])
 def update_address_image(request, address_id):
-    if not Address.objects.filter(address_id=address_id).exists():
+    if not Address.objects.filter(address_id=address_id, status='active').exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
     address = Address.objects.get(address_id=address_id)
     image = request.data.get("image")
@@ -127,37 +182,45 @@ def update_address_image(request, address_id):
     serializer = AddressSerializer(address)
     return Response(serializer.data)
 
+# FIXATIONS
+
 #8
 @api_view(["GET"])
+@permission_classes([IsAuth])
 def fixations_list(request):
     date_formation_start = request.GET.get("date_formation_start")
     date_formation_end = request.GET.get("date_formation_end")
 
-    fixations = Fixation.objects.all()
+    try:
+        username = session_storage.get(request.COOKIES["session_id"]).decode('utf-8')
+    except:
+        return Response(status=status.HTTP_401_UNAUTHORIZED)
 
-    if date_formation_start and parse_datetime(date_formation_start):
-        fixations = fixations.filter(created_at__gte=parse_datetime(date_formation_start))
-
-    if date_formation_end and parse_datetime(date_formation_end):
-        fixations = fixations.filter(created_at__lt=parse_datetime(date_formation_end))
-
+    if User.objects.filter(username = username).exists():
+        user = get_object_or_404(User, username = username)
+        if user.is_staff or user.is_superuser:
+            fixations = Fixation.objects.all()
+        else:
+            fixations = Fixation.objects.filter(owner=user).exclude(status=5)
     serializer = FixationsSerializer(fixations, many=True)
-    
     return Response(serializer.data)
 
 #9
 @api_view(["GET"])  
+@permission_classes([IsAuth])
 def get_fix_by_id(request, fix_id):
-    if not Fixation.objects.filter(fixation_id=fix_id).exists():
+    if not Fixation.objects.filter(fixation_id=fix_id).exclude(status=5).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
     fixation = Fixation.objects.get(fixation_id=fix_id)
     serializer = FixationsSerializer(fixation, many=False)
     return Response(serializer.data)
 
 #10
+@swagger_auto_schema(method='put', request_body=FixationsSerializer)
 @api_view(["PUT"])
+@permission_classes([IsAuth])
 def update_fix_by_id(request, fix_id):
-    if not Fixation.objects.filter(fixation_id=fix_id).exists():
+    if not Fixation.objects.filter(fixation_id=fix_id).exclude(status=5).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
     fixation = Fixation.objects.get(fixation_id=fix_id)
     month = request.data.get("month")
@@ -170,11 +233,17 @@ def update_fix_by_id(request, fix_id):
     return Response(serializer.data)
 
 #11
+@swagger_auto_schema(method='put', request_body=FixationsSerializer)
 @api_view(["PUT"])
+@permission_classes([IsAuth])
 def update_status_user(request, fix_id):
-    if not Fixation.objects.filter(fixation_id=fix_id).exists():
+    username = session_storage.get(request.COOKIES["session_id"]).decode('utf-8')
+    user = get_object_or_404(User, username = username)
+    if not Fixation.objects.filter(fixation_id=fix_id).exclude(status=5).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
     fixation = Fixation.objects.get(fixation_id=fix_id)
+    if fixation.owner != user:
+        return Response(status=status.HTTP_403_FORBIDDEN)
     if fixation.status == 1:
         fixation.status = 2
         fixation.submitted_at = timezone.now()
@@ -185,17 +254,19 @@ def update_status_user(request, fix_id):
         return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
     
 #12
+@swagger_auto_schema(method='put', request_body=FixationsSerializer)
 @api_view(["PUT"])
+@permission_classes([IsModerator])
 def update_status_admin(request, fix_id):
-    if not Fixation.objects.filter(fixation_id=fix_id).exists():
+    if not Fixation.objects.filter(fixation_id=fix_id).exclude(status=5).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
     stat = request.data["status"]
-    if stat not in [3, 4]:
+    if int(stat) not in [3, 4]:
         return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
     fixation = Fixation.objects.get(fixation_id=fix_id)
     if fixation.status == 2:
         fixation.completed_at = timezone.now()
-        fixation.status = 3
+        fixation.status = 3 #stat
         fixation.moderator = get_moderator()
         fixation.save()
         serializer = FixationsSerializer(fixation, many=False)
@@ -204,8 +275,9 @@ def update_status_admin(request, fix_id):
         return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
 #13
 @api_view(["DELETE"])
+@permission_classes([IsAuth])
 def delete_fix(request, fix_id):
-    if not Fixation.objects.filter(fixation_id=fix_id).exists():
+    if not Fixation.objects.filter(fixation_id=fix_id).exclude(status=5).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
     fixation = Fixation.objects.get(fixation_id=fix_id)
     # if fixation.status != 1:
@@ -215,8 +287,14 @@ def delete_fix(request, fix_id):
     fixation.save()
     serializer = FixationsSerializer(fixation, many=False)
     return Response(serializer.data)
+
+
+#M-M
+
 #14
+@swagger_auto_schema(method='put', request_body=AddressFixationSerializer)
 @api_view(["PUT"])
+@permission_classes([IsAuth])
 def update_address_in_fix(request, fix_id, address_id):
     if not AddressFixation.objects.filter(fixation_id=fix_id, address_id=address_id).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
@@ -232,6 +310,7 @@ def update_address_in_fix(request, fix_id, address_id):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 #15
 @api_view(["DELETE"])
+@permission_classes([IsAuth])
 def delete_address_from_fix(request, fix_id, address_id):
     if not AddressFixation.objects.filter(fixation_id=fix_id, address_id=address_id).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
@@ -241,35 +320,93 @@ def delete_address_from_fix(request, fix_id, address_id):
     serializer = FixationsSerializer(fixation, many=False)
     addresses = serializer.data["addresses"]
     if not len(addresses):
-        fixation.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
     return Response(addresses)
-#16
+
+
+#USERS
+
+@swagger_auto_schema(method='post', request_body=UserRegisterSerializer)
+@api_view(["POST"])
+def register_user(request, format=None): 
+    try:
+        if request.COOKIES["session_id"] is not None:
+            return Response({'status': 'Уже в системе'}, status=status.HTTP_403_FORBIDDEN)
+    except:
+        if User.objects.filter(username = request.data['username']).exists(): 
+            return Response({'status': 'Exist'}, status=400)
+        serializer = UserRegisterSerializer(data=request.data) 
+        if not serializer.is_valid():
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        serializer.save()
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+@swagger_auto_schema(method='post', request_body=UserLoginSerializer)
+@api_view(["POST"])
+def login_user(request):
+    try:
+        if request.COOKIES["session_id"] is not None:
+            return Response({'status': 'Уже в системе'}, status=status.HTTP_403_FORBIDDEN)
+    except:
+        username = str(request.data["username"]) 
+        password = request.data["password"]
+        user = authenticate(request, username=username, password=password)
+        if user is not None:
+            random_key = str(uuid.uuid4()) 
+            session_storage.set(random_key, username)
+            response = Response({'status': f'{username} успешно вошел в систему'})
+            response.set_cookie("session_id", random_key)
+
+            return response
+        else:
+            return HttpResponse("{'status': 'error', 'error': 'login failed'}")
+    
+@permission_classes([IsAuth])
+@api_view(["POST"])
+def logout_user(request):
+    try:
+        username = session_storage.get(request.COOKIES["session_id"])
+        username = username.decode('utf-8')
+        logout(request._request)
+        response = Response({'Message': f'{username} вышел из системы'})
+        response.delete_cookie('session_id')
+        return response
+    except:
+        return Response({"Message":"Нет авторизованных пользователей"})
+    
+@swagger_auto_schema(method='put', request_body=UserSerializer)
+@permission_classes([IsAuth])
 @api_view(["PUT"])
-def update_user(request, user_id):
-    if not User.objects.filter(pk=user_id).exists():
+def private_user(request):
+    try:
+        username = session_storage.get(request.COOKIES["session_id"])
+        username = username.decode('utf-8')
+    except:
+        return Response({"Message":"Нет авторизованных пользователей"})
+    
+    if not User.objects.filter(username = username).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
+    
+    user = get_object_or_404(User, username = username)
 
-    user = User.objects.get(pk=user_id)
-    serializer = UserSerializer(user, data=request.data, many=False, partial=True)
-
+    serializer = UserSerializer(user, data=request.data, partial=True)
     if not serializer.is_valid():
         return Response(status=status.HTTP_409_CONFLICT)
 
     serializer.save()
 
-    return Response(serializer.data)
-#17
-@api_view(["POST"])
-def register(request):
-    serializer = UserRegisterSerializer(data=request.data)
+    return Response(serializer.data, status=status.HTTP_200_OK)
 
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_409_CONFLICT)
-
-    user = serializer.save()
-
+@permission_classes([IsAuth])
+@api_view(["GET"])
+def whoami(request):
+    try:
+        username = session_storage.get(request.COOKIES["session_id"])
+        username = username.decode('utf-8')
+    except:
+        return Response({"Message":"Нет авторизованных пользователей"})
+    
+    user = get_object_or_404(User, username = username)
     serializer = UserSerializer(user)
-
-    return Response(serializer.data, status=status.HTTP_201_CREATED)
-
+    return Response(serializer.data)
