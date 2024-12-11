@@ -38,10 +38,21 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
-    "app"
+    "app",
+    "drf_yasg",
+    "corsheaders"
 ]
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.BasicAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ]
+}
+
+
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -49,6 +60,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    
 ]
 
 ROOT_URLCONF = "app.urls"
@@ -116,10 +128,14 @@ TIME_ZONE = "UTC"
 USE_I18N = True
 
 USE_TZ = True
+REDIS_HOST = 'redis'
+REDIS_PORT = 6379
 
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
 
 STATIC_URL = "static/"
 

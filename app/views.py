@@ -2,6 +2,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from .serializers import *
 from .models import *
+import datetime
+import random
 from rest_framework.views import APIView
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 # from .miniof import *
@@ -61,6 +63,7 @@ def GetFix(id):
 @api_view(["GET"])
 def search_addresses(request):
     # draft = GetDraftFix()
+    query = request.query_params.get("name", "")
     try:
         username = session_storage.get(request.COOKIES["session_id"])
         username = username.decode('utf-8') 
@@ -77,7 +80,7 @@ def search_addresses(request):
             fix_id = fix.fixation_id
             fix_count = fix_id
 
-    addresses = Address.objects.filter(status='active')
+    addresses = Address.objects.filter(status='active', address_name__icontains=query)
     serializer = AddressSerializer(addresses, many=True)
     response = {    
         "addresses" : serializer.data,
@@ -160,9 +163,14 @@ def add_address_to_fix(request, address_id):
         draft_booking.save()
     if AddressFixation.objects.filter(fixation=draft_booking, address=address).exists():
         return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
+    year = random.randint(1900, 2022)
+    month = random.randint(1, 12)
+    day = random.randint(1, 28)
+    date = datetime.date(year, month, day)
     item = AddressFixation.objects.create()
     item.fixation = draft_booking
     item.address = address
+    item.pay_date = date
     item.save()
     serializer = FixationsSerializer(draft_booking, many=False)
     return Response(serializer.data["addresses"])
