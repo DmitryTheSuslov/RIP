@@ -2,7 +2,10 @@ from rest_framework.response import Response
 from rest_framework import status
 from .serializers import *
 from .models import *
-import datetime
+import random
+from datetime import datetime, timedelta, date
+
+# Генерируем случайную дату
 import random
 from rest_framework.views import APIView
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -27,13 +30,35 @@ from .permissions import *
 from django.db.models import Min, Max
 
 
+
 session_storage = redis.StrictRedis(host=settings.REDIS_HOST, port=settings.REDIS_PORT)
 
+def GetDraftFix(request, id=None):
+    """ПОЛУЧЕНИЕ ЧЕРНОВИКА ЗАЯВКИ"""
+    session_id = request.COOKIES.get("session_id")
+    if not session_id:
+        return None  # возвращаем None, если session_id отсутствует
 
-def GetDraftFix(user):
-    if Fixation.objects.filter(owner=user, status=1).exists():
-        return Fixation.objects.filter(owner=user, status=1).first()
-    return None
+    username = session_storage.get(session_id)
+    if not username:
+        return None  # возвращаем None, если пользователь не найден в сессии
+
+    username = username.decode('utf-8')
+    try:
+        current_user = User.objects.get(username=username)
+    except User.DoesNotExist:
+        return None  # возвращаем None, если пользователь не найден в базе данных
+
+    if id is not None:
+        return Fixation.objects.filter(owner=current_user, fixation_id=id).first() 
+    else:
+        return Fixation.objects.filter(owner=current_user, status=1).first() 
+
+
+# def GetDraftFix(user):
+#     if Fixation.objects.filter(owner=user, status=1).exists():
+#         return Fixation.objects.filter(owner=user, status=1).first()
+#     return None
 
 def GetUser():
     try:
@@ -64,28 +89,16 @@ def GetFix(id):
 def search_addresses(request):
     # draft = GetDraftFix()
     query = request.query_params.get("name", "")
-    try:
-        username = session_storage.get(request.COOKIES["session_id"])
-        username = username.decode('utf-8') 
-    except:
-        username = ''
 
-    fix_id = None
-    fix_count = 0
-
-    if User.objects.filter(username = username).exists():
-        user = get_object_or_404(User, username = username)
-        if Fixation.objects.filter(owner = user, status = 1).exists():
-            fix = get_object_or_404(Fixation, owner = user, status = 1)
-            fix_id = fix.fixation_id
-            fix_count = fix_id
+    draft = GetDraftFix(request) if request.COOKIES.get("session_id") else None
+    draft_count = AddressFixation.objects.filter(fixation=draft.fixation_id).count() if draft else None
 
     addresses = Address.objects.filter(status='active', address_name__icontains=query)
     serializer = AddressSerializer(addresses, many=True)
     response = {    
         "addresses" : serializer.data,
-        "draft_fixation" : fix_id,
-        "addresses_count" : fix_count
+        "draft_fixation" : draft.fixation_id if draft else None,
+        "addresses_count" : draft_count
     }
     return Response(response)
 
@@ -149,31 +162,29 @@ def delete_address(request, address_id):
 @api_view(["POST"])
 @permission_classes([IsAuth])
 def add_address_to_fix(request, address_id):
-    username = session_storage.get(request.COOKIES["session_id"])
-    username = username.decode('utf-8') 
-    user = get_object_or_404(User, username = username)
-    if not Address.objects.filter(address_id=address_id, status='active').exists():
-        return Response(status=status.HTTP_404_NOT_FOUND)
-    address = Address.objects.get(address_id=address_id)
-    draft_booking = GetDraftFix(user)
-    if draft_booking is None:
-        draft_booking = Fixation.objects.create()
-        draft_booking.owner = user
-        draft_booking.created_at = timezone.now()
-        draft_booking.save()
-    if AddressFixation.objects.filter(fixation=draft_booking, address=address).exists():
+    try:
+        if not Address.objects.filter(address_id=address_id).exists():
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        address = Address.objects.get(address_id=address_id)
+        draft_booking = GetDraftFix(request)
+        if draft_booking is None:
+            draft_booking = Fixation.objects.create()
+            username = session_storage.get(request.COOKIES["session_id"])
+            username = username.decode('utf-8')
+            user = User.objects.get(username=username)
+            draft_booking.owner = user
+            draft_booking.created_at = timezone.now()
+            draft_booking.save()
+        if AddressFixation.objects.filter(fixation=draft_booking, address=address).exists():
+            return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
+        item = AddressFixation.objects.create()
+        item.fixation = draft_booking
+        item.address = address
+        item.save()
+        serializer = FixationsSerializer(draft_booking, many=False)
+        return Response(serializer.data)
+    except:
         return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
-    year = random.randint(1900, 2022)
-    month = random.randint(1, 12)
-    day = random.randint(1, 28)
-    date = datetime.date(year, month, day)
-    item = AddressFixation.objects.create()
-    item.fixation = draft_booking
-    item.address = address
-    item.pay_date = date
-    item.save()
-    serializer = FixationsSerializer(draft_booking, many=False)
-    return Response(serializer.data["addresses"])
 
 #7
 @swagger_auto_schema(method='post', request_body=AddressSerializer)
@@ -217,7 +228,7 @@ def fixations_list(request):
 @api_view(["GET"])  
 @permission_classes([IsAuth])
 def get_fix_by_id(request, fix_id):
-    if not Fixation.objects.filter(fixation_id=fix_id).exclude(status=5).exists():
+    if not Fixation.objects.filter(fixation_id=fix_id).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
     fixation = Fixation.objects.get(fixation_id=fix_id)
     serializer = FixationsSerializer(fixation, many=False)
@@ -253,6 +264,13 @@ def update_status_user(request, fix_id):
     if fixation.owner != user:
         return Response(status=status.HTTP_403_FORBIDDEN)
     if fixation.status == 1:
+        mms = AddressFixation.objects.filter(fixation_id=fix_id).all()
+        for mm in mms:
+            start_date = date.today().replace(day=1, month=1).toordinal()
+            end_date = date.today().toordinal()
+            random_day = date.fromordinal(random.randint(start_date, end_date)).replace(year=2025)
+            mm.pay_date = random_day
+            mm.save()
         fixation.status = 2
         fixation.submitted_at = timezone.now()
         fixation.save()
@@ -264,7 +282,7 @@ def update_status_user(request, fix_id):
 #12
 @swagger_auto_schema(method='put', request_body=FixationsSerializer)
 @api_view(["PUT"])
-@permission_classes([IsModerator])
+# @permission_classes([IsModerator])
 def update_status_admin(request, fix_id):
     if not Fixation.objects.filter(fixation_id=fix_id).exclude(status=5).exists():
         return Response(status=status.HTTP_404_NOT_FOUND)
@@ -277,6 +295,13 @@ def update_status_admin(request, fix_id):
         fixation.status = 3 #stat
         fixation.moderator = get_moderator()
         fixation.save()
+        mms = AddressFixation.objects.filter(fixation_id=fix_id).all()
+        for mm in mms:
+            start_date = date.today().replace(day=1, month=1, year=2025).toordinal()
+            end_date = date.today().toordinal()
+            random_day = date.fromordinal(random.randint(start_date, end_date))
+            mm.pay_date = random_day
+            mm.save()
         serializer = FixationsSerializer(fixation, many=False)
         return Response(serializer.data)
     else: 

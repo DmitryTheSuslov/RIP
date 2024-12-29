@@ -16,6 +16,10 @@ class Address(models.Model):
 
     def __str__(self):
         return self.address_name
+    
+    def get_counter_value(self, fix):
+        mm = AddressFixation.objects.filter(address=self, fixation=fix).first()
+        return mm.water_counter_value if mm else None
 
     class Meta:
         verbose_name = "Адрес"
@@ -33,7 +37,7 @@ class Fixation(models.Model):
     )
     fixation_id = models.AutoField(primary_key=True)
     status = models.IntegerField(choices=STATUS_CHOICES, default=1, verbose_name="Статус")
-    month = models.IntegerField(default=0, verbose_name="Месяц")
+    month = models.IntegerField(null=True, verbose_name="Месяц")
     created_at = models.DateTimeField(blank=True, null=True)
     submitted_at = models.DateTimeField(blank=True, null=True)
     completed_at = models.DateTimeField(blank=True, null=True)
